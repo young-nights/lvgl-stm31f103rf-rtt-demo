@@ -38,18 +38,28 @@
 /* macSYS 头文件 */
 #include "bsp_typedef.h"
 
-/* LVGL 路径下头文件 */
+/* macGUI 路径下头文件 */
+// --lvgl_custom
+#include "lvgl_events.h"
+#include "setup_scr_screen.h"
+// --lvgl_examples
+#include "lvgl_tests.h"
+// --lvgl_gui
 #include "lvgl_gui.h"
+// --porting
 #include "lv_port_disp.h"
 #include "lv_port_indev.h"
-#include <macGUI/lvgl_custom/setup_scr_screen.h>
-#include <macGUI/lvgl_examples/lvgl_tests.h>
+// --lvgl
+#include "lv_rt_thread_conf.h"
+#include "lv_conf.h"
 
 
 // 这个宏用于使能lv_printf.c文件中的lv_snprintf()函数
 #define USE_LV_SNPRINTF          0
 // A button with a label and react on click event
 #define USE_LVGL_TEST_BUTTON     0
+
+
 
 
 #endif /* APPLICATIONS_MACSYS_INC_BSP_SYS_H_ */

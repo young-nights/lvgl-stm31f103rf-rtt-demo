@@ -7,9 +7,9 @@
  * Date           Author       Notes
  * 2025-08-29     18452       the first version
  */
-#include <macGUI/lvgl_examples/lvgl_tests.h>
+#include "lvgl_tests.h"
 
-#ifdef USE_LVGL_TEST_BUTTON
+#if USE_LVGL_TEST_BUTTON
 
 static void btn_event_cb(lv_event_t * e)
 {

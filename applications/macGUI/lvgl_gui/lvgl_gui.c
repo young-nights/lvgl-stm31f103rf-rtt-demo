@@ -21,9 +21,11 @@ void lv_user_gui_init(void)
     lv_example_get_started_1();
 #endif
 
-    setup_src_screen(&guider_lvgl);
-
-
+#define USE_GUI_GUIDER 1
+#if USE_GUI_GUIDER
+    extern void setup_ui(lvgl_ui_t *ui);
+    setup_ui(&guider_lvgl);
+#endif
 }
 
 

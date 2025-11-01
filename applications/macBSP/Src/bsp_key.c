@@ -9,221 +9,184 @@
 #include "bsp_key.h"
 
 
+/* Key value table */
+const char keys[3][3] = {
+    {'3', '2', '1'},
+    {'6', '5', '4'},
+    {'9', '8', '7'}
+};
 
-char keys[3][3] = { {'1', '2', '3'},
-                    {'4', '5', '6'},
-                    {'7', '8', '9'}};
 
 
-/**
- * @brief  第一行第一列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row1_Column1_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
+/* ------------------- 消抖 & 事件 ------------------- */
+static uint8_t debounce_cnt[3][3] = {{0}};      // 计数器
+static uint8_t stable_state[3][3] = {{1}};      // 1 = 释放，0 = 按下（上电默认高）
+key_event_t current_key = {0, 0, KEY_NONE};
+
+
+/* GPIO control functions */
+void GPIO_SetColumn(MatrixKey_ColumnName_TypeDef col, MatrixKey_Status_TypeDef state) {
+    GPIO_PinState pinState = (state == Matrix_SET) ? GPIO_PIN_SET : GPIO_PIN_RESET;
+    GPIO_TypeDef* port;
+    uint16_t pin;
+
+    switch (col) {
+        case Matrix_Column_1:
+            port = Matrixkey_Column1_GPIO_Port;
+            pin = Matrixkey_Column1_Pin;
+            break;
+        case Matrix_Column_2:
+            port = Matrixkey_Column2_GPIO_Port;
+            pin = Matrixkey_Column2_Pin;
+            break;
+        case Matrix_Column_3:
+            port = Matrixkey_Column3_GPIO_Port;
+            pin = Matrixkey_Column3_Pin;
+            break;
+        default:
+            return;
+    }
+    HAL_GPIO_WritePin(port, pin, pinState);
 }
 
 
-/**
- * @brief  第二行第一列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row2_Column1_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
-}
 
+uint8_t GPIO_ReadRow(MatrixKey_RowName_TypeDef row) {
+    GPIO_TypeDef* port;
+    uint16_t pin;
 
-/**
- * @brief  第三行第一列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row3_Column1_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
-}
-
-
-
-
-/**
- * @brief  第一行第二列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row1_Column2_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
-}
-
-
-/**
- * @brief  第二行第二列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row2_Column2_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
-}
-
-
-/**
- * @brief  第三行第二列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row3_Column2_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
+    switch (row) {
+        case Matrix_Row_1:
+            port = Matrixkey_Row1_GPIO_Port;
+            pin = Matrixkey_Row1_Pin;
+            break;
+        case Matrix_Row_2:
+            port = Matrixkey_Row2_GPIO_Port;
+            pin = Matrixkey_Row2_Pin;
+            break;
+        case Matrix_Row_3:
+            port = Matrixkey_Row3_GPIO_Port;
+            pin = Matrixkey_Row3_Pin;
+            break;
+        default:
+            return 1;  // Default high
+    }
+    return (HAL_GPIO_ReadPin(port, pin) == GPIO_PIN_RESET) ? 0 : 1;  // 0 if low (pressed), 1 if high
 }
 
 
 
 
+/* Event trigger callback function pointer */
+void (*key_event_callback)(key_event_t event) = NULL;
+
 /**
- * @brief  第一行第三列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row1_Column3_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
+  * @brief  Set the callback function for key events.
+  * @param  callback: Pointer to the callback function.
+  * @retval void
+  */
+void MatrixKey_SetCallback(void (*callback)(key_event_t event)) {
+    key_event_callback = callback;
 }
 
 
-/**
- * @brief  第二行第三列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row2_Column3_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
+// 定义自定义回调函数
+void MyCustomKeyHandler(key_event_t event) {
+    char key_value = keys[event.row - 1][event.col - 1];  // 获取键值（从 keys 表中）
+
+    if (event.state == KEY_PRESS) {
+        rt_kprintf("Custom Handler: Key '%c' pressed at Row %d, Col %d\n", key_value, event.row, event.col);
+        // 这里添加你的自定义逻辑，例如：更新 LCD 显示、发送到队列、或触发其他事件
+    } else if (event.state == KEY_RELEASE) {
+        rt_kprintf("Custom Handler: Key '%c' released at Row %d, Col %d\n", key_value, event.row, event.col);
+        // 自定义释放逻辑
+    }
 }
 
 
-/**
- * @brief  第三行第三列的按键执行函数
- * @param  None
- * @retval None
- */
-static void MatrixKey_Row3_Column3_Press(void)
-{
-//    LED_Blink(LED_Name_Green, 1, 0, 0);
+// 在初始化函数中注册回调（例如在 main() 或其他 init 函数中调用）
+void App_Key_Init(void) {
+    // 注册自定义回调，替换默认处理
+    MatrixKey_SetCallback(MyCustomKeyHandler);
 }
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 /**
- * @brief  矩阵按键扫描函数
- * @param  无
- * @retval 轮询法：主动循环置低列所对应的引脚，然后循环反复轮询各个行上的按键状态
- */
+  * @brief  Default event handler (can be overridden by user callback).
+  *         Prints the key event.
+  * @param  event: The key event.
+  * @retval void
+  */
+void Default_Key_Event_Handler(key_event_t event) {
+    if (event.state == KEY_PRESS) {
+        rt_kprintf("Key pressed: %c (Row %d, Col %d)\n", keys[event.row-1][event.col-1], event.row, event.col);
+    } else if (event.state == KEY_RELEASE) {
+        rt_kprintf("Key released: %c (Row %d, Col %d)\n", keys[event.row-1][event.col-1], event.row, event.col);
+    }
+}
+
+
+/* ------------------- 扫描 + 消抖 ------------------- */
 void MatrixKey_Scan(void)
 {
-    {
-        HAL_GPIO_WritePin(Matrixkey_Column1_GPIO_Port, Matrixkey_Column1_Pin, (GPIO_PinState)Matrix_RESET);
-        HAL_GPIO_WritePin(Matrixkey_Column2_GPIO_Port, Matrixkey_Column2_Pin, (GPIO_PinState)Matrix_SET);
-        HAL_GPIO_WritePin(Matrixkey_Column3_GPIO_Port, Matrixkey_Column3_Pin, (GPIO_PinState)Matrix_SET);
+    uint8_t row, col;
+    uint8_t cur_level;
 
-        /* 读取当前行的状态 -- 进一步锁定矩阵按键的位置 */
-        if (HAL_GPIO_ReadPin(Matrixkey_Row1_GPIO_Port, Matrixkey_Row1_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row1_GPIO_Port, Matrixkey_Row1_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row1_Column1_Press();
-        }
-        else if (HAL_GPIO_ReadPin(Matrixkey_Row2_GPIO_Port, Matrixkey_Row2_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row2_GPIO_Port, Matrixkey_Row2_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row2_Column1_Press();
-        }
-        else if (HAL_GPIO_ReadPin(Matrixkey_Row3_GPIO_Port, Matrixkey_Row3_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row3_GPIO_Port, Matrixkey_Row3_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row3_Column1_Press();
+    current_key.state = KEY_NONE;   // 每次扫描先清空
 
-        }
-    }
+    for (col = Matrix_Column_1; col <= Matrix_Column_3; ++col) {
+        /* 拉低当前列，其余列拉高 */
+        for (uint8_t c = Matrix_Column_1; c <= Matrix_Column_3; ++c)
+            GPIO_SetColumn(c, (c == col) ? Matrix_RESET : Matrix_SET);
 
+        rt_thread_mdelay(1);   // 让电平稳定
 
+        for (row = Matrix_Row_1; row <= Matrix_Row_3; ++row) {
+            cur_level = GPIO_ReadRow(row);               // 0 = 低（按下），1 = 高（释放）
 
+            uint8_t r = row - 1, c = col - 1;             // 数组下标
 
-    {
-        HAL_GPIO_WritePin(Matrixkey_Column1_GPIO_Port, Matrixkey_Column1_Pin, (GPIO_PinState)Matrix_SET);
-        HAL_GPIO_WritePin(Matrixkey_Column2_GPIO_Port, Matrixkey_Column2_Pin, (GPIO_PinState)Matrix_RESET);
-        HAL_GPIO_WritePin(Matrixkey_Column3_GPIO_Port, Matrixkey_Column3_Pin, (GPIO_PinState)Matrix_SET);
-        /* 读取当前行的状态 -- 进一步锁定矩阵按键的位置 */
-        if (HAL_GPIO_ReadPin(Matrixkey_Row1_GPIO_Port, Matrixkey_Row1_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row1_GPIO_Port, Matrixkey_Row1_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row1_Column2_Press();
-        }
-        else if (HAL_GPIO_ReadPin(Matrixkey_Row2_GPIO_Port, Matrixkey_Row2_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row2_GPIO_Port, Matrixkey_Row2_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row2_Column2_Press();
-        }
-        else if (HAL_GPIO_ReadPin(Matrixkey_Row3_GPIO_Port, Matrixkey_Row3_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row3_GPIO_Port, Matrixkey_Row3_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row3_Column2_Press();
+            if (cur_level == 0) {                        // 检测到低电平
+                if (debounce_cnt[r][c] < DEBOUNCE_THRESHOLD)
+                    debounce_cnt[r][c]++;
+
+                if (debounce_cnt[r][c] == DEBOUNCE_THRESHOLD && stable_state[r][c] == 1) {
+                    /* 确认按下 */
+                    stable_state[r][c] = 0;
+                    current_key.row   = row;
+                    current_key.col   = col;
+                    current_key.state = KEY_PRESS;
+
+                    if (key_event_callback)
+                        key_event_callback(current_key);
+                    else
+                        Default_Key_Event_Handler(current_key);
+                }
+            } else {                                     // 检测到高电平
+                if (debounce_cnt[r][c] > 0)
+                    debounce_cnt[r][c]--;
+
+                if (debounce_cnt[r][c] == 0 && stable_state[r][c] == 0) {
+                    /* 确认释放 */
+                    stable_state[r][c] = 1;
+                    current_key.row   = row;
+                    current_key.col   = col;
+                    current_key.state = KEY_RELEASE;
+
+                    if (key_event_callback)
+                        key_event_callback(current_key);
+                    else
+                        Default_Key_Event_Handler(current_key);
+                }
+            }
         }
     }
 
-
-
-    {
-        HAL_GPIO_WritePin(Matrixkey_Column1_GPIO_Port, Matrixkey_Column1_Pin, (GPIO_PinState)Matrix_SET);
-        HAL_GPIO_WritePin(Matrixkey_Column2_GPIO_Port, Matrixkey_Column2_Pin, (GPIO_PinState)Matrix_SET);
-        HAL_GPIO_WritePin(Matrixkey_Column3_GPIO_Port, Matrixkey_Column3_Pin, (GPIO_PinState)Matrix_RESET);
-        /* 读取当前行的状态 -- 进一步锁定矩阵按键的位置 */
-        if (HAL_GPIO_ReadPin(Matrixkey_Row1_GPIO_Port, Matrixkey_Row1_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row1_GPIO_Port, Matrixkey_Row1_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row1_Column3_Press();
-        }
-        else if (HAL_GPIO_ReadPin(Matrixkey_Row2_GPIO_Port, Matrixkey_Row2_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row2_GPIO_Port, Matrixkey_Row2_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row2_Column3_Press();
-
-        }
-        else if (HAL_GPIO_ReadPin(Matrixkey_Row3_GPIO_Port, Matrixkey_Row3_Pin) == (GPIO_PinState)Matrix_RESET) {
-            /* 等待释放 */
-            while (HAL_GPIO_ReadPin(Matrixkey_Row3_GPIO_Port, Matrixkey_Row3_Pin) == (GPIO_PinState)Matrix_RESET);
-            /* 按下后的执行函数 */
-            MatrixKey_Row3_Column3_Press();
-
-        }
-    }
+    /* 扫描结束，所有列恢复高电平 */
+    for (col = Matrix_Column_1; col <= Matrix_Column_3; ++col)
+        GPIO_SetColumn(col, Matrix_SET);
 }
-
-
 
 
 /*---------------------------------------------------------------------------------------------------------------*/
@@ -239,7 +202,7 @@ void Matrixkey_Thread_entry(void* parameter)
     for(;;)
     {
         MatrixKey_Scan();
-        rt_thread_mdelay(10);
+        rt_thread_mdelay(20);
     }
 }
 
@@ -257,6 +220,7 @@ int Matrixkey_Thread_Init(void)
     if(Matrixkey_Task_Handle != RT_NULL)
     {
         rt_kprintf("PRINTF:%d. Matrixkey_Thread_entry is Succeed!! \r\n",Record.kprintf_cnt++);
+        App_Key_Init();
         rt_thread_startup(Matrixkey_Task_Handle);
     }
     else {

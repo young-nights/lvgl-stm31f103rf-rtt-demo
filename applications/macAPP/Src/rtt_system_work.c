@@ -37,7 +37,7 @@ static void Timing_50ms(void)
 
 static void Timing_500ms(void)
 {
-    LED_Blink(LED_Name_Green, 1, 0, 0);
+
 }
 
 
@@ -97,7 +97,7 @@ int sysTimer_Init(void)
 
     return RT_EOK;
 }
-
+INIT_APP_EXPORT(sysTimer_Init);
 
 
 

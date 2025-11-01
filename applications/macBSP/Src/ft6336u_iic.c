@@ -98,8 +98,6 @@ rt_err_t iic_ft6336u_write_reg_nbytes(struct rt_i2c_bus_device *bus,
 
 
 
-
-
 /**
  * @brief   ft6336u向寄存器中写入多个字节的数据(reg+data)
  * @param  *bus     : 设备结点
@@ -128,9 +126,6 @@ rt_err_t iic_ft6336u_write_reg_datas(struct rt_i2c_bus_device *bus,rt_uint8_t* d
         return RT_ERROR;
     }
 }
-
-
-
 
 
 

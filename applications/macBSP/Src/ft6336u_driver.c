@@ -9,7 +9,7 @@
  */
 #include "ft6336u_driver.h"
 
-#define USE_PRINTF_POINT_XY 1
+#define USE_PRINTF_POINT_XY 0
 
 FT6336U_IC_REG ft6336u_reg = {
         .ID_G_CIPHER_HIGH       = 0xA3, // 读取：芯片代号高字节
