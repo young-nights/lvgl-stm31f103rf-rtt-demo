@@ -25,8 +25,8 @@
 #include "main.h"
 
 /* macAPP 头文件 */
+#include "rtt_hwtimer_state_machine.h"
 #include "rtt_system_work.h"
-
 /* macBSP 头文件 */
 #include "bsp_key.h"
 #include "bsp_led.h"
