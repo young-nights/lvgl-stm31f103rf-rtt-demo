@@ -35,3 +35,7 @@ DebugConfig/
 RTE/
 settings/
 *.uvguix*
+
+# RT-Thread packages (downloaded by package manager)
+packages/
+libraries/
